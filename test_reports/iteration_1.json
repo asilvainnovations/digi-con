@@ -1,0 +1,144 @@
+{
+  "iteration": 1,
+  "summary": "18 checks executed (11 backend pytest assertions across 5 files, 7 browser flows) covering all 8 acceptance criteria. All passed on this run.",
+  "passed": 18,
+  "failed": 0,
+  "retest_needed": false,
+  "bugs": [],
+  "action_items": [],
+  "checks": [
+    {
+      "criterion": "Auth + onboarding forces 3-step onboarding and lands on dashboard with a created card",
+      "name": "test_tscheck_auth_onboarding.py::test_signup_sets_session_and_onboarding_creates_card",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/auth/signup -> 200, digicon_session cookie set; GET /api/cards before onboarding -> []; POST /api/auth/onboarding -> 200 onboarded=true; GET /api/cards after -> 1 card, published=true"
+    },
+    {
+      "criterion": "Auth + onboarding: duplicate signup rejected",
+      "name": "test_tscheck_auth_onboarding.py::test_signup_duplicate_email_rejected",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Second POST /api/auth/signup with same email -> 409"
+    },
+    {
+      "criterion": "Auth + onboarding: a brand-new signup is forced through the 3-step onboarding and lands on a dashboard with a created card",
+      "name": "auth-signup-onboarding-dashboard",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Signup -> onboarding steps 1-3 -> 'Your DigiCon is ready.' heading -> Go to dashboard -> dashboard-greeting visible -> /cards shows exactly 1 card-item"
+    },
+    {
+      "criterion": "Card builder: free user capped at 1 card (402)",
+      "name": "test_tscheck_card_builder_gating.py::test_free_user_second_card_returns_402",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Logged in as free@digicon.app (already owns 1 card); POST /api/cards -> 402 'Free plan includes 1 card. Upgrade to add more.'"
+    },
+    {
+      "criterion": "Card builder: pro user creates a 2nd card, publishes publicly with no auth",
+      "name": "test_tscheck_card_builder_gating.py::test_pro_user_can_create_second_card_and_it_publishes_publicly",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Logged in as maria@digicon.app; POST /api/cards -> 200 with slug; anonymous GET /api/public/cards/{slug} -> 200 with matching name; test cleans up its own card via DELETE"
+    },
+    {
+      "criterion": "Card builder creates/edits a card with live preview and publishes it at a public URL; free user gets an upgrade redirect",
+      "name": "card-builder-pro-create-and-publish",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Pro user fills builder form at /cards/new, Save navigates to /share; /c/maria-santos renders publicly (public-card-canvas visible); free user's /cards shows cards-upgrade-cta which navigates to /pricing"
+    },
+    {
+      "criterion": "Public card contact exchange requires no account and creates a relationship for the card owner",
+      "name": "test_tscheck_public_connect.py::test_public_connect_creates_relationship_for_owner",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Anonymous POST /api/public/cards/maria-santos/connect -> 200 ok=true; owner GET /api/relationships?q=<visitor> -> 1 row, status=New, source=public_card; test deletes the relationship it created"
+    },
+    {
+      "criterion": "Public card never exposes private fields (notes/opportunity_value/health)",
+      "name": "test_tscheck_public_connect.py::test_public_card_never_exposes_private_fields",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/public/cards/maria-santos -> 200; response body has no notes/opportunity_value/health/followups keys"
+    },
+    {
+      "criterion": "Public card contact exchange requires no account and creates a relationship for the card owner", 
+      "name": "public-card-connect-creates-relationship",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "On /c/maria-santos, Connect dialog submit shows public-card-connect-success panel; logged in as maria, /contacts search for the visitor name returns the new row"
+    },
+    {
+      "criterion": "Relationship workspace: search, status filter, detail tabs, edit, interaction log",
+      "name": "relationship-workspace-search-filter-edit",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created tscheck- fixture relationship; search by name and by company filters to it; status filter 'New' still shows it; Context/Interactions/Edit tabs work; logged interaction appears in Interactions timeline; Edit tab company change persists after page reload"
+    },
+    {
+      "criterion": "Follow-ups: create from a relationship, filter, and complete",
+      "name": "followups-create-filter-complete",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Added follow-up on relationship detail Follow-ups tab -> appears in detail-followups-list and as Next action on Context tab; /followups Open/All show it, Overdue filter excludes it (due today); Complete moves it to Completed filter and logs a 'Follow-up completed' interaction visible on the relationship's Interactions tab"
+    },
+    {
+      "criterion": "Plan gating enforced by backend: free user 402 on analytics/export",
+      "name": "test_tscheck_plan_gating.py::test_free_user_gets_402_on_analytics_and_export",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/analytics as free@digicon.app -> 402 'Upgrade required...'; GET /api/cards/{id}/export -> 402"
+    },
+    {
+      "criterion": "Plan gating: pro user gets real analytics content",
+      "name": "test_tscheck_plan_gating.py::test_pro_user_gets_real_analytics_content",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/analytics as maria@digicon.app -> 200 with summary/trend/badges, summary.plan=pro"
+    },
+    {
+      "criterion": "Plan gating: entitlements matrix reflects plan",
+      "name": "test_tscheck_plan_gating.py::test_entitlements_matrix_reflects_plan",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/entitlements as free@digicon.app -> 200, analytics/wallet/landing_pwa/crm_pipeline all allowed=false"
+    },
+    {
+      "criterion": "Plan gating is enforced by the backend, not just hidden in the UI",
+      "name": "plan-gating-ui-free-vs-pro",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "free@digicon.app sees analytics-upgrade-gate/crm-upgrade-gate/wallet-upgrade-gate/landingpwa-upgrade-gate on /analytics /crm /wallet /landing-pwa; maria@digicon.app sees real content (analytics-insights, crm-board, wallet-panel, landingpwa-templates) on all four with no gate present"
+    },
+    {
+      "criterion": "Super admin area protected: non-admin gets 403 on /api/admin/stats",
+      "name": "test_tscheck_admin_blog.py::test_non_admin_gets_403_on_admin_stats",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/admin/stats as free@digicon.app -> 403"
+    },
+    {
+      "criterion": "Super admin area: admin views stats, toggles a user's plan, publishes a blog post visible publicly",
+      "name": "test_tscheck_admin_blog.py::test_admin_can_view_stats_toggle_plan_and_publish_post",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/admin/stats -> 200 users>=3; PATCH /api/admin/users/{id}/plan toggles then restores free@digicon.app's plan (round-tripped, 200 both times); POST /api/admin/posts published=true -> 200; anonymous GET /api/posts includes new slug and GET /api/posts/{slug} -> 200; test deletes its post via DELETE /api/admin/posts/{id}"
+    },
+    {
+      "criterion": "Super admin area is protected and the blog CMS publishes",
+      "name": "admin-protected-and-blog-cms-publishes",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "free user navigating to /admin is redirected back to dashboard-greeting; admin@digicon.app sees admin-users-table, creates+publishes a tscheck post via CMS which then appears on public /blog list"
+    },
+    {
+      "criterion": "Mobile navigation and states are consistent across the app",
+      "name": "mobile-nav-consistency-and-empty-states",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "At 390px width, bottom-navigation visible with correct item marked active (text-sky class) on /dashboard /cards /contacts /followups /settings; no horizontal overflow (scrollWidth<=clientWidth) on any route; free user's /contacts and /followups show contacts-empty / followups-empty states"
+    }
+  ]
+}
