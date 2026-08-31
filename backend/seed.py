@@ -158,91 +158,107 @@ POSTS = [
 ]
 
 
-async def seed_user(account: dict, with_contacts: bool) -> None:
+async def upsert_account(account: dict) -> str:
     existing = await db.users.find_one({"email": account["email"]})
     if existing:
-        user_id = existing["id"]
         await db.users.update_one(
-            {"id": user_id},
+            {"id": existing["id"]},
             {"$set": {"plan": account["plan"], "role": account["role"],
                       "password": hash_password(account["password"])}},
         )
-    else:
-        user_id = str(uuid.uuid4())
-        await db.users.insert_one(
-            {
-                "id": user_id, "email": account["email"], "name": account["name"],
-                "password": hash_password(account["password"]), "role": account["role"],
-                "plan": account["plan"], "title": account["title"], "company": account["company"],
-                "phone": account["phone"], "avatar_url": "", "networking_goal": account["networking_goal"],
-                "onboarded": True, "created_at": days(150),
-            }
+        return existing["id"]
+    user_id = str(uuid.uuid4())
+    await db.users.insert_one(
+        {
+            "id": user_id, "email": account["email"], "name": account["name"],
+            "password": hash_password(account["password"]), "role": account["role"],
+            "plan": account["plan"], "title": account["title"], "company": account["company"],
+            "phone": account["phone"], "avatar_url": "", "networking_goal": account["networking_goal"],
+            "onboarded": True, "created_at": days(150),
+        }
+    )
+    return user_id
+
+
+async def ensure_card(account: dict, user_id: str) -> None:
+    if await db.cards.find_one({"user_id": user_id}):
+        return
+    await db.cards.insert_one(
+        {
+            "id": str(uuid.uuid4()), "user_id": user_id, "slug": account["slug"],
+            "label": "Primary", "template": "founder", "orientation": "portrait",
+            "accent": "#22d3ee", "name": account["name"], "title": account["title"],
+            "company": account["company"],
+            "bio": "Building solutions that create impact. Always open to meeting people who build things.",
+            "phone": account["phone"], "email": account["email"],
+            "website": "www.neora.com" if account["plan"] == "pro" else "www.kalikha.ph",
+            "location": "Manila, Philippines", "avatar_url": "", "logo_url": "",
+            "services": ["Product strategy", "Partnerships", "Advisory"],
+            "socials": [{"label": "LinkedIn", "url": "https://linkedin.com"},
+                        {"label": "Website", "url": "https://neora.com"}],
+            "booking_url": "https://cal.com/digicon", "published": True, "views": 128,
+            "created_at": days(140),
+        }
+    )
+
+
+async def insert_contact(user_id: str, contact: dict) -> None:
+    rel_id = str(uuid.uuid4())
+    created = days(contact["days_ago"])
+    await db.relationships.insert_one(
+        {
+            "id": rel_id, "user_id": user_id, "name": contact["name"], "company": contact["company"],
+            "position": contact["position"], "email": contact["email"], "phone": contact["phone"],
+            "website": "", "avatar_url": "", "met_at": contact["met_at"], "event": contact["event"],
+            "date_met": created.date().isoformat(), "category": contact["category"],
+            "tags": contact["tags"], "interest": contact["interest"], "status": contact["status"],
+            "notes": contact["notes"], "opportunity_value": contact["opportunity_value"],
+            "health": contact["health"], "source": "manual",
+            "last_interaction": created, "created_at": created,
+        }
+    )
+    last = created
+    for kind, summary, ago in contact["interactions"]:
+        when = days(ago)
+        await db.interactions.insert_one(
+            {"id": str(uuid.uuid4()), "relationship_id": rel_id, "user_id": user_id,
+             "kind": kind, "summary": summary, "created_at": when}
+        )
+        last = max(last, when)
+    await db.relationships.update_one({"id": rel_id}, {"$set": {"last_interaction": last}})
+
+    followup = contact["followup"]
+    if followup:
+        await db.followups.insert_one(
+            {"id": str(uuid.uuid4()), "user_id": user_id, "relationship_id": rel_id,
+             "title": followup["title"], "kind": followup["kind"],
+             "due_date": (NOW + timedelta(days=followup["due_in"])).date().isoformat(),
+             "notes": "", "status": followup["status"], "created_at": created}
         )
 
-    if not await db.cards.find_one({"user_id": user_id}):
-        await db.cards.insert_one(
-            {
-                "id": str(uuid.uuid4()), "user_id": user_id, "slug": account["slug"],
-                "label": "Primary", "template": "founder", "orientation": "portrait",
-                "accent": "#22d3ee", "name": account["name"], "title": account["title"],
-                "company": account["company"],
-                "bio": "Building solutions that create impact. Always open to meeting people who build things.",
-                "phone": account["phone"], "email": account["email"],
-                "website": "www.neora.com" if account["plan"] == "pro" else "www.kalikha.ph",
-                "location": "Manila, Philippines", "avatar_url": "", "logo_url": "",
-                "services": ["Product strategy", "Partnerships", "Advisory"],
-                "socials": [{"label": "LinkedIn", "url": "https://linkedin.com"},
-                            {"label": "Website", "url": "https://neora.com"}],
-                "booking_url": "https://cal.com/digicon", "published": True, "views": 128,
-                "created_at": days(140),
-            }
+
+async def insert_completed_followups(user_id: str) -> None:
+    """Completed history so follow-up completion-rate analytics are meaningful."""
+    first = await db.relationships.find_one({"user_id": user_id})
+    if not first:
+        return
+    for title, ago in [("Send introduction email", 25), ("Follow up after event", 10)]:
+        await db.followups.insert_one(
+            {"id": str(uuid.uuid4()), "user_id": user_id, "relationship_id": first["id"],
+             "title": title, "kind": "Task",
+             "due_date": (NOW - timedelta(days=ago)).date().isoformat(),
+             "notes": "", "status": "Completed", "created_at": days(ago + 5)}
         )
 
+
+async def seed_user(account: dict, with_contacts: bool) -> None:
+    user_id = await upsert_account(account)
+    await ensure_card(account, user_id)
     if not with_contacts or await db.relationships.find_one({"user_id": user_id}):
         return
-
-    for c in CONTACTS:
-        rel_id = str(uuid.uuid4())
-        created = days(c["days_ago"])
-        last = created
-        await db.relationships.insert_one(
-            {
-                "id": rel_id, "user_id": user_id, "name": c["name"], "company": c["company"],
-                "position": c["position"], "email": c["email"], "phone": c["phone"], "website": "",
-                "avatar_url": "", "met_at": c["met_at"], "event": c["event"],
-                "date_met": created.date().isoformat(), "category": c["category"], "tags": c["tags"],
-                "interest": c["interest"], "status": c["status"], "notes": c["notes"],
-                "opportunity_value": c["opportunity_value"], "health": c["health"],
-                "source": "manual", "last_interaction": last, "created_at": created,
-            }
-        )
-        for kind, summary, ago in c["interactions"]:
-            when = days(ago)
-            await db.interactions.insert_one(
-                {"id": str(uuid.uuid4()), "relationship_id": rel_id, "user_id": user_id,
-                 "kind": kind, "summary": summary, "created_at": when}
-            )
-            if when > last:
-                last = when
-        await db.relationships.update_one({"id": rel_id}, {"$set": {"last_interaction": last}})
-        f = c["followup"]
-        if f:
-            await db.followups.insert_one(
-                {"id": str(uuid.uuid4()), "user_id": user_id, "relationship_id": rel_id,
-                 "title": f["title"], "kind": f["kind"],
-                 "due_date": (NOW + timedelta(days=f["due_in"])).date().isoformat(),
-                 "notes": "", "status": f["status"], "created_at": created}
-            )
-    # a couple of completed follow-ups so completion-rate analytics are meaningful
-    first = await db.relationships.find_one({"user_id": user_id})
-    if first:
-        for title, ago in [("Send introduction email", 25), ("Follow up after event", 10)]:
-            await db.followups.insert_one(
-                {"id": str(uuid.uuid4()), "user_id": user_id, "relationship_id": first["id"],
-                 "title": title, "kind": "Task",
-                 "due_date": (NOW - timedelta(days=ago)).date().isoformat(),
-                 "notes": "", "status": "Completed", "created_at": days(ago + 5)}
-            )
+    for contact in CONTACTS:
+        await insert_contact(user_id, contact)
+    await insert_completed_followups(user_id)
 
 
 async def main() -> None:

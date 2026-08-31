@@ -3,24 +3,16 @@ import uuid
 
 import httpx
 
-FREE_EMAIL = "free@digicon.app"
-ADMIN_EMAIL = "admin@digicon.app"
-PASSWORD = "DigiCon2026!"
-
-
-def _login(client: httpx.Client, email: str) -> None:
-    resp = client.post("/auth/login", json={"email": email, "password": PASSWORD})
-    assert resp.status_code == 200, resp.text
-
-
-def test_non_admin_gets_403_on_admin_stats(client: httpx.Client):
-    _login(client, FREE_EMAIL)
+def test_non_admin_gets_403_on_admin_stats(client: httpx.Client, login_as):
+    login_as("free")
     resp = client.get("/admin/stats")
     assert resp.status_code == 403, resp.text
 
 
-def test_admin_can_view_stats_toggle_plan_and_publish_post(client: httpx.Client):
-    _login(client, ADMIN_EMAIL)
+def test_admin_can_view_stats_toggle_plan_and_publish_post(
+    client: httpx.Client, login_as, credentials
+):
+    login_as("admin")
 
     stats_resp = client.get("/admin/stats")
     assert stats_resp.status_code == 200, stats_resp.text
@@ -28,7 +20,7 @@ def test_admin_can_view_stats_toggle_plan_and_publish_post(client: httpx.Client)
 
     users_resp = client.get("/admin/users")
     assert users_resp.status_code == 200
-    free_user = next(u for u in users_resp.json() if u["email"] == FREE_EMAIL)
+    free_user = next(u for u in users_resp.json() if u["email"] == credentials.free_email)
     original_plan = free_user["plan"]
 
     toggled_plan = "pro" if original_plan == "free" else "free"

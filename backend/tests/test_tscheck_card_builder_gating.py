@@ -3,16 +3,6 @@ import uuid
 
 import httpx
 
-FREE_EMAIL = "free@digicon.app"
-PRO_EMAIL = "maria@digicon.app"
-PASSWORD = "DigiCon2026!"
-
-
-def _login(client: httpx.Client, email: str, password: str) -> None:
-    resp = client.post("/auth/login", json={"email": email, "password": password})
-    assert resp.status_code == 200, resp.text
-
-
 def _card_payload(suffix: str) -> dict:
     return {
         "label": f"tscheck-card-{suffix}",
@@ -22,8 +12,8 @@ def _card_payload(suffix: str) -> dict:
     }
 
 
-def test_free_user_second_card_returns_402(client: httpx.Client):
-    _login(client, FREE_EMAIL, PASSWORD)
+def test_free_user_second_card_returns_402(client: httpx.Client, login_as):
+    login_as("free")
     existing = client.get("/cards")
     assert existing.status_code == 200
     assert len(existing.json()) >= 1, "free seed user should already own 1 card"
@@ -33,8 +23,10 @@ def test_free_user_second_card_returns_402(client: httpx.Client):
     assert "upgrade" in resp.json()["detail"].lower()
 
 
-def test_pro_user_can_create_second_card_and_it_publishes_publicly(client: httpx.Client):
-    _login(client, PRO_EMAIL, PASSWORD)
+def test_pro_user_can_create_second_card_and_it_publishes_publicly(
+    client: httpx.Client, login_as
+):
+    login_as("pro")
     suffix = uuid.uuid4().hex[:8]
     resp = client.post("/cards", json=_card_payload(suffix))
     assert resp.status_code == 200, resp.text

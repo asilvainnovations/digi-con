@@ -193,6 +193,7 @@ export default function Contacts() {
   const [status, setStatus] = useState("all");
   const [open, setOpen] = useState(params.get("new") === "1");
 
+  // Debounce the search box: only `search` drives it; the timer is cleaned up on each change.
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
     return () => clearTimeout(t);

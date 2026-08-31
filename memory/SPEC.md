@@ -52,7 +52,34 @@ Desktop: sidebar with the same primary set plus Grow group (CRM, Analytics, Shar
 ## Design system
 Glass + metal, deep navy foundation, electric blue/cyan for action, gold reserved for premium.
 Fonts: Montserrat (headings), Poppins (UI), Roboto Condensed (dense text) via @fontsource.
-PWA: `public/manifest.webmanifest` + `public/sw.js` (API always network, shell cached).
+
+## Branding assets (official — never redrawn)
+`public/icon-192.png` (authoritative circular DigiCon mark, also used by `DigiConMark`),
+`icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`, `favicon.webp`.
+Story imagery in `public/brand/{connect,share,remember,grow,male}.webp` plus `-sm` phone
+variants (source PNGs ~2 MB each → ~50-240 KB webp). Rendered by
+`components/brand/BrandImage.tsx`: `<picture>` + phone source + lazy loading, and **uncropped
+by default** (the assets are complete posters containing the logo, product UI and QR codes).
+
+## PWA
+`public/manifest.webmanifest` (standalone, official icon set, maskable icon, app shortcuts) +
+`public/sw.js` (API always network-first, shell cached, tolerant install).
+`components/pwa/InstallPrompt.tsx` — mounted once in App: fires the native
+`beforeinstallprompt` flow when offered, otherwise shows iOS/Android/desktop instructions.
+Never shown when `display-mode: standalone`; dismissal stored in `localStorage`
+(`digicon.install.dismissedAt`) and snoozed 7 days; first appearance delayed 12s.
+
+## Navigation
+Mobile protected: persistent glass bottom nav (Home, Cards, Network, Follow Up, Profile) +
+drawer for secondary. Mobile public: persistent glass bottom nav (Home, Pricing, Use Cases,
+Blog, Sign in/Workspace) with the footer collapsed to legal essentials. Desktop: sidebar in
+the app, header + full footer on the marketing site. Both bottom bars respect
+`env(safe-area-inset-bottom)`; content clears them via bottom padding.
+
+## SEO
+`index.html`: single H1 per page, descriptive title/meta description, canonical, Open Graph +
+Twitter card using `/brand/connect.webp`, official icon links. Every meaningful image carries
+unique descriptive alt text; decorative marks use `alt=""`.
 
 ## Seed data (`cd /app/backend && python seed.py`, idempotent)
 Pro account owns 6 relationships (David Lim, Miguel Reyes, Aisha Rahman, Jessica Chen,

@@ -1,0 +1,152 @@
+{
+  "iteration": 2,
+  "mode": "retest",
+  "summary": "Retest of PWA/landing/nav refactor: re-ran full pre-existing suite (14 backend pytest assertions across 6 files, 8 browser flows) with zero regressions, plus added 1 new backend test file (3 assertions) and 6 new browser checks for the 5 new PWA/landing/nav criteria. 20 checks total, all passed.",
+  "passed": 20,
+  "failed": 0,
+  "retest_needed": false,
+  "bugs": [],
+  "action_items": [],
+  "checks": [
+    {
+      "criterion": "Backend refactors behave identically (regression)",
+      "name": "test_tscheck_auth_onboarding.py (2 tests)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Re-run: POST /api/auth/signup -> 200 + session cookie; onboarding creates card; duplicate signup -> 409"
+    },
+    {
+      "criterion": "Backend refactors behave identically (regression)",
+      "name": "test_tscheck_card_builder_gating.py (2 tests)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Re-run: free 2nd card -> 402; pro 2nd card creates + publishes publicly at /c/{slug}"
+    },
+    {
+      "criterion": "Backend refactors behave identically (regression)",
+      "name": "test_tscheck_public_connect.py (2 tests)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Re-run: anonymous connect creates relationship for owner; public card never exposes notes/opportunity_value/health"
+    },
+    {
+      "criterion": "Backend refactors behave identically (regression)",
+      "name": "test_tscheck_plan_gating.py (3 tests)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Re-run: free 402 on analytics/export; pro 200 with summary.plan=pro; entitlements matrix false for free"
+    },
+    {
+      "criterion": "Backend refactors behave identically (regression)",
+      "name": "test_tscheck_admin_blog.py (2 tests)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Re-run: non-admin 403 on /api/admin/stats; admin stats/plan-toggle/blog publish round-trip all 200"
+    },
+    {
+      "criterion": "Backend refactors behave identically: GET /api/dashboard and /api/analytics keep full documented shape for maria (6 trend points, 6 badges, completion_rate, conversion_rate, non-empty insights) and 402 for free",
+      "name": "test_tscheck_dashboard_analytics_shape.py (3 tests, new)",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/dashboard as pro -> 200, plan=pro + summary fields; GET /api/analytics as pro -> 200, trend len=6, badges len=6, completion_rate=41, conversion_rate=12, insights len=3; GET /api/analytics as free -> 402. Credentials from tests/.env.test via existing login_as fixture."
+    },
+    {
+      "criterion": "All previously working functionality is preserved after the refactor (auth+onboarding)",
+      "name": "auth-signup-onboarding-dashboard",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run (reran-persisted): signup -> onboarding 3 steps -> dashboard-greeting -> /cards shows 1 card"
+    },
+    {
+      "criterion": "All previously working functionality is preserved after the refactor (card builder)",
+      "name": "card-builder-pro-create-and-publish",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run: pro builds+publishes card at /c/maria-santos; free sees cards-upgrade-cta -> /pricing"
+    },
+    {
+      "criterion": "All previously working functionality is preserved after the refactor (public connect)",
+      "name": "public-card-connect-creates-relationship",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run: connect dialog -> public-card-connect-success; new relationship visible in /contacts search"
+    },
+    {
+      "criterion": "All previously working functionality is preserved after the refactor (relationship workspace)",
+      "name": "relationship-workspace-search-filter-edit",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run: search/filter/tabs/interaction log/edit persistence all intact"
+    },
+    {
+      "criterion": "All previously working functionality is preserved after the refactor (follow-ups)",
+      "name": "followups-create-filter-complete",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run: create, Open/Overdue/Completed filters, completion logs interaction"
+    },
+    {
+      "criterion": "All previously working functionality is preserved after the refactor (plan gating UI)",
+      "name": "plan-gating-ui-free-vs-pro",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run: free sees 4 upgrade gates on /analytics /crm /wallet /landing-pwa; pro sees real content on all four"
+    },
+    {
+      "criterion": "All previously working functionality is preserved after the refactor (admin + blog CMS)",
+      "name": "admin-protected-and-blog-cms-publishes",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run: free redirected off /admin; admin creates+publishes post, visible on public /blog"
+    },
+    {
+      "criterion": "All previously working functionality is preserved after the refactor (mobile nav/empty states, protected)",
+      "name": "mobile-nav-consistency-and-empty-states",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Re-run: bottom-navigation correct active state on 5 protected routes at 390px, no overflow, free empty states intact"
+    },
+    {
+      "criterion": "PWA install prompt works intelligently",
+      "name": "pwa-install-prompt-dismiss-persists",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "At 390px on /, install-prompt appeared within 25s with Install DigiCon CTA; tapping Install (no native beforeinstallprompt available in this Chromium) revealed install-prompt-steps; tapping Maybe Later hid the prompt and set localStorage digicon.install.dismissedAt; after reload the prompt stayed hidden"
+    },
+    {
+      "criterion": "PWA is installable: manifest and official icon set are served",
+      "name": "pwa-manifest-and-icons-served",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "GET /manifest.webmanifest -> 200 display=standalone, name contains DigiCon, icons include 192/512/maskable-512; /icon-192.png /icon-512.png /icon-maskable-512.png /apple-touch-icon.png /favicon.webp /sw.js all -> 200 with correct content-types; index.html has link[rel=manifest]=/manifest.webmanifest, link[rel=apple-touch-icon]=/apple-touch-icon.png, meta[name=theme-color] set"
+    },
+    {
+      "criterion": "Official circular DigiCon icon is used as the brand mark",
+      "name": "digicon-brand-logo-mark",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "On /pricing, digicon-logo-link (aria-label=DigiCon home) contains digicon-mark img with src=/icon-192.png and alt=\"\"; clicking the link navigates to / and shows landing-hero-heading"
+    },
+    {
+      "criterion": "Landing page integrates the supplied brand imagery full-width with SEO alt text",
+      "name": "landing-brand-imagery-and-alt-text",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "At 390px, scrolled through landing-banner-hero + 4 story images (share/connect/remember/grow): all had naturalWidth>0, unique alt text >40 chars each, rendered aspect ratio within 15% of natural (uncropped), and all below-the-fold images had loading=lazy"
+    },
+    {
+      "criterion": "Landing narrative covers the DigiCon journey with working CTAs",
+      "name": "landing-narrative-ctas",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Exactly 1 h1; landing-section-{share,connect,remember,grow} all present; landing-secondary-cta jumps to #how-it-works; landing-pricing-cta -> /pricing; landing-primary-cta and landing-footer-cta (signed out) -> /signup"
+    },
+    {
+      "criterion": "Persistent glass bottom navigation on mobile, correct desktop behaviour",
+      "name": "public-bottom-nav-and-desktop-hidden",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "At 390px, public-bottom-navigation has exactly 5 links (Home/Pricing/Use Cases/Blog/Sign in), active item marked via aria-current=page, each link navigates correctly (/,/use-cases,/blog,/login), no horizontal overflow on /,/pricing,/use-cases,/blog,/login; at 1280px public-bottom-navigation is hidden and header nav (public-nav-pricing) is used instead"
+    }
+  ]
+}

@@ -1,18 +1,8 @@
 """Criterion: Plan gating enforced by the backend for free vs pro users."""
 import httpx
 
-FREE_EMAIL = "free@digicon.app"
-PRO_EMAIL = "maria@digicon.app"
-PASSWORD = "DigiCon2026!"
-
-
-def _login(client: httpx.Client, email: str) -> None:
-    resp = client.post("/auth/login", json={"email": email, "password": PASSWORD})
-    assert resp.status_code == 200, resp.text
-
-
-def test_free_user_gets_402_on_analytics_and_export(client: httpx.Client):
-    _login(client, FREE_EMAIL)
+def test_free_user_gets_402_on_analytics_and_export(client: httpx.Client, login_as):
+    login_as("free")
 
     analytics_resp = client.get("/analytics")
     assert analytics_resp.status_code == 402, analytics_resp.text
@@ -26,8 +16,8 @@ def test_free_user_gets_402_on_analytics_and_export(client: httpx.Client):
     assert export_resp.status_code == 402, export_resp.text
 
 
-def test_pro_user_gets_real_analytics_content(client: httpx.Client):
-    _login(client, PRO_EMAIL)
+def test_pro_user_gets_real_analytics_content(client: httpx.Client, login_as):
+    login_as("pro")
     resp = client.get("/analytics")
     assert resp.status_code == 200, resp.text
     body = resp.json()
@@ -35,8 +25,8 @@ def test_pro_user_gets_real_analytics_content(client: httpx.Client):
     assert body["summary"]["plan"] == "pro"
 
 
-def test_entitlements_matrix_reflects_plan(client: httpx.Client):
-    _login(client, FREE_EMAIL)
+def test_entitlements_matrix_reflects_plan(client: httpx.Client, login_as):
+    login_as("free")
     resp = client.get("/entitlements")
     assert resp.status_code == 200
     gates = {g["feature"]: g["allowed"] for g in resp.json()}

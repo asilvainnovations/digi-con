@@ -1,9 +1,15 @@
 /* DigiCon service worker — network-first for /api, cache-first for the app shell. */
-const CACHE = "digicon-shell-v1";
-const SHELL = ["/", "/manifest.webmanifest", "/favicon.svg"];
+const CACHE = "digicon-shell-v2";
+const SHELL = ["/", "/manifest.webmanifest", "/favicon.webp", "/icon-192.png"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      // Cache what we can; a single missing asset must never block installation.
+      .then((c) => Promise.allSettled(SHELL.map((url) => c.add(url))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (event) => {

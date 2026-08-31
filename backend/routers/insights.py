@@ -1,15 +1,14 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from lib import insights_rules as rules
 from lib.auth import current_user, require_feature
 from lib.dates import today_iso
 from lib.db import db
 
 router = APIRouter(tags=["insights"])
-
-ACTIVE = {"Active", "Partner", "Customer", "In Progress", "Opportunity"}
 
 
 class DashboardSummary(BaseModel):
@@ -60,104 +59,60 @@ class Analytics(BaseModel):
     insights: list[str]
 
 
-async def build_summary(user: dict) -> DashboardSummary:
-    uid = user["id"]
-    rels = await db.relationships.find({"user_id": uid}).to_list(1000)
-    fus = await db.followups.find({"user_id": uid}).to_list(1000)
-    cards = await db.cards.find({"user_id": uid}).to_list(100)
+async def load_workspace(user_id: str) -> tuple[list[dict], list[dict], list[dict]]:
+    rels = await db.relationships.find({"user_id": user_id}).to_list(1000)
+    followups = await db.followups.find({"user_id": user_id}).to_list(1000)
+    cards = await db.cards.find({"user_id": user_id}).to_list(100)
+    return rels, followups, cards
+
+
+def summarise(
+    user: dict, rels: list[dict], followups: list[dict], cards: list[dict]
+) -> DashboardSummary:
+    now = datetime.now(timezone.utc)
     today = today_iso()
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-    dormant_cut = datetime.now(timezone.utc) - timedelta(days=45)
-
-    def created(r):
-        c = r.get("created_at")
-        return c.replace(tzinfo=timezone.utc) if c and c.tzinfo is None else c
-
-    def last(r):
-        c = r.get("last_interaction") or r.get("created_at")
-        return c.replace(tzinfo=timezone.utc) if c and c.tzinfo is None else c
-
-    opportunities = [r for r in rels if r.get("status") in ("Opportunity", "Partner", "Customer")]
-    open_fus = [f for f in fus if f.get("status") != "Completed"]
-    health_vals = [r.get("health", 70) for r in rels] or [0]
+    open_followups = [f for f in followups if rules.is_open(f)]
     return DashboardSummary(
         connections=len(rels),
-        new_connections_30d=len([r for r in rels if created(r) and created(r) >= cutoff]),
-        active_relationships=len([r for r in rels if r.get("status") in ACTIVE]),
-        dormant_relationships=len(
-            [r for r in rels if last(r) and last(r) < dormant_cut or r.get("status") == "Dormant"]
-        ),
-        followups_due=len(open_fus),
-        followups_overdue=len([f for f in open_fus if f["due_date"] < today]),
-        followups_completed=len([f for f in fus if f.get("status") == "Completed"]),
-        opportunities=len(opportunities),
-        opportunity_value=float(sum(r.get("opportunity_value", 0) or 0 for r in opportunities)),
+        new_connections_30d=sum(1 for r in rels if rules.is_new(r, now)),
+        active_relationships=sum(1 for r in rels if rules.is_active(r)),
+        dormant_relationships=sum(1 for r in rels if rules.is_dormant(r, now)),
+        followups_due=len(open_followups),
+        followups_overdue=sum(1 for f in open_followups if rules.is_overdue(f, today)),
+        followups_completed=sum(1 for f in followups if f.get("status") == "Completed"),
+        opportunities=sum(1 for r in rels if rules.is_opportunity(r)),
+        opportunity_value=rules.total_opportunity_value(rels),
         card_views=sum(c.get("views", 0) for c in cards),
-        relationship_health=int(sum(health_vals) / len(health_vals)),
+        relationship_health=rules.average_health(rels),
         plan=user.get("plan", "free"),
     )
 
 
-@router.get("/dashboard", response_model=DashboardSummary)
-async def dashboard(user: dict = Depends(current_user)):
-    return await build_summary(user)
-
-
-@router.get("/analytics", response_model=Analytics)
-async def analytics(user: dict = Depends(current_user)):
-    require_feature(user, "analytics")
-    uid = user["id"]
-    summary = await build_summary(user)
-    rels = await db.relationships.find({"user_id": uid}).to_list(1000)
-    fus = await db.followups.find({"user_id": uid}).to_list(1000)
-
-    trend: list[TrendPoint] = []
+def build_trend(rels: list[dict], followups: list[dict]) -> list[TrendPoint]:
     now = datetime.now(timezone.utc)
-    for i in range(5, -1, -1):
-        start = (now - timedelta(days=30 * (i + 1))).replace(tzinfo=timezone.utc)
-        end = (now - timedelta(days=30 * i)).replace(tzinfo=timezone.utc)
-
-        def within(value):
-            if not value:
-                return False
-            v = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
-            return start <= v < end
-
-        trend.append(
-            TrendPoint(
-                label=end.strftime("%b"),
-                connections=len([r for r in rels if within(r.get("created_at"))]),
-                followups=len([f for f in fus if within(f.get("created_at"))]),
-            )
+    return [
+        TrendPoint(
+            label=label,
+            connections=sum(1 for r in rels if rules.in_window(r.get("created_at"), start, end)),
+            followups=sum(1 for f in followups if rules.in_window(f.get("created_at"), start, end)),
         )
-
-    status_counts: dict[str, int] = {}
-    for r in rels:
-        status_counts[r.get("status", "New")] = status_counts.get(r.get("status", "New"), 0) + 1
-    event_counts: dict[str, int] = {}
-    for r in rels:
-        key = r.get("event") or r.get("met_at") or "Direct"
-        event_counts[key] = event_counts.get(key, 0) + 1
-
-    completed = summary.followups_completed
-    total_fu = len(fus) or 1
-    completion_rate = int(completed / total_fu * 100)
-    conversion_rate = int(summary.opportunities / (summary.connections or 1) * 100)
-
-    badges = [
-        Badge(name="Growing Network", description="10+ connections captured",
-              earned=summary.connections >= 10),
-        Badge(name="Follow-up Champion", description="70%+ follow-up completion",
-              earned=completion_rate >= 70),
-        Badge(name="Highly Connected", description="25+ connections", earned=summary.connections >= 25),
-        Badge(name="Relationship Builder", description="5+ active relationships",
-              earned=summary.active_relationships >= 5),
-        Badge(name="Opportunity Creator", description="3+ opportunities created",
-              earned=summary.opportunities >= 3),
-        Badge(name="Consistent Networker", description="New connections in the last 30 days",
-              earned=summary.new_connections_30d >= 3),
+        for label, start, end in rules.monthly_windows(now)
     ]
 
+
+def build_badges(summary: DashboardSummary, completion_rate: int) -> list[Badge]:
+    definitions = [
+        ("Growing Network", "10+ connections captured", summary.connections >= 10),
+        ("Follow-up Champion", "70%+ follow-up completion", completion_rate >= 70),
+        ("Highly Connected", "25+ connections", summary.connections >= 25),
+        ("Relationship Builder", "5+ active relationships", summary.active_relationships >= 5),
+        ("Opportunity Creator", "3+ opportunities created", summary.opportunities >= 3),
+        ("Consistent Networker", "New connections in the last 30 days", summary.new_connections_30d >= 3),
+    ]
+    return [Badge(name=n, description=d, earned=e) for n, d, e in definitions]
+
+
+def build_insights(summary: DashboardSummary, sources: dict[str, int]) -> list[str]:
     insights: list[str] = []
     if summary.followups_overdue:
         insights.append(f"{summary.followups_overdue} follow-up(s) are overdue — clear these first.")
@@ -165,24 +120,46 @@ async def analytics(user: dict = Depends(current_user)):
         insights.append(
             f"{summary.dormant_relationships} relationship(s) have gone quiet for 45+ days."
         )
-    top_event = max(event_counts.items(), key=lambda kv: kv[1], default=None)
-    if top_event:
-        insights.append(f"{top_event[0]} is your strongest connection source ({top_event[1]} people).")
+    top_source = max(sources.items(), key=lambda kv: kv[1], default=None)
+    if top_source:
+        insights.append(
+            f"{top_source[0]} is your strongest connection source ({top_source[1]} people)."
+        )
     if summary.opportunities:
         insights.append(
             f"{summary.opportunities} connection(s) look like real opportunities "
             f"(~${summary.opportunity_value:,.0f})."
         )
-    if not insights:
-        insights.append("Capture your first connections to unlock networking insights.")
+    return insights or ["Capture your first connections to unlock networking insights."]
+
+
+@router.get("/dashboard", response_model=DashboardSummary)
+async def dashboard(user: dict = Depends(current_user)):
+    rels, followups, cards = await load_workspace(user["id"])
+    return summarise(user, rels, followups, cards)
+
+
+@router.get("/analytics", response_model=Analytics)
+async def analytics(user: dict = Depends(current_user)):
+    require_feature(user, "analytics")
+    rels, followups, cards = await load_workspace(user["id"])
+    summary = summarise(user, rels, followups, cards)
+
+    completion_rate = rules.percent(summary.followups_completed, len(followups))
+    conversion_rate = rules.percent(summary.opportunities, summary.connections)
+    status_counts = rules.count_by(rels, "status", "New")
+    sources = rules.connection_sources(rels)
 
     return Analytics(
         summary=summary,
-        trend=trend,
+        trend=build_trend(rels, followups),
         by_status=[StatusSlice(status=k, count=v) for k, v in sorted(status_counts.items())],
-        by_event=[EventSlice(event=k, count=v) for k, v in sorted(event_counts.items(), key=lambda kv: -kv[1])[:6]],
-        badges=badges,
+        by_event=[
+            EventSlice(event=k, count=v)
+            for k, v in sorted(sources.items(), key=lambda kv: -kv[1])[:6]
+        ],
+        badges=build_badges(summary, completion_rate),
         completion_rate=completion_rate,
         conversion_rate=conversion_rate,
-        insights=insights,
+        insights=build_insights(summary, sources),
     )

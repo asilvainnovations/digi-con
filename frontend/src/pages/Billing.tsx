@@ -97,6 +97,8 @@ export function PaymentSuccess() {
     retry: false,
   });
 
+  // Polls only while state === "pending"; `status.data` + `attempts` are the only inputs that
+  // should retrigger it. `navigate`/`sessionId` are stable for the life of this screen.
   useEffect(() => {
     if (!status.data) return;
     if (status.data.payment_status === "paid") {

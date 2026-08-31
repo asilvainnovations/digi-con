@@ -45,3 +45,43 @@ async def aclient():
 
 
 # --- app-specific fixtures below this line ---
+
+from pathlib import Path  # noqa: E402
+
+from dotenv import load_dotenv  # noqa: E402
+
+# Credentials live in tests/.env.test (or the real environment) — never inline in test modules.
+load_dotenv(Path(__file__).parent / ".env.test", override=False)
+
+
+class Credentials:
+    """Seed-account credentials resolved from the environment."""
+
+    def __init__(self) -> None:
+        self.password = os.environ["DIGICON_TEST_PASSWORD"]
+        self.pro_email = os.environ["DIGICON_TEST_PRO_EMAIL"]
+        self.free_email = os.environ["DIGICON_TEST_FREE_EMAIL"]
+        self.admin_email = os.environ["DIGICON_TEST_ADMIN_EMAIL"]
+        self.pro_card_slug = os.environ["DIGICON_TEST_PRO_CARD_SLUG"]
+
+
+@pytest.fixture(scope="session")
+def credentials() -> Credentials:
+    return Credentials()
+
+
+@pytest.fixture
+def login_as(client, credentials):
+    """login_as("pro") / login_as("free") / login_as("admin") — authenticates `client`."""
+
+    def _login(role: str):
+        email = {
+            "pro": credentials.pro_email,
+            "free": credentials.free_email,
+            "admin": credentials.admin_email,
+        }[role]
+        resp = client.post("/auth/login", json={"email": email, "password": credentials.password})
+        assert resp.status_code == 200, resp.text
+        return resp.json()
+
+    return _login

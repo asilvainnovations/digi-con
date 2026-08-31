@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
+import InstallPrompt from "@/components/pwa/InstallPrompt";
 import { Protected } from "@/components/layout/Layouts";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
@@ -79,6 +80,7 @@ export default function App() {
         <Route path="*" element={<Landing />} />
       </Routes>
       <Toaster position="top-center" richColors />
+      <InstallPrompt />
     </>
   );
 }
