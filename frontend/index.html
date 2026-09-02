@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>DigiCon — Your Professional Identity, Connections &amp; Relationship Workspace</title>
+    <meta
+      name="description"
+      content="DigiCon turns your digital business card into a relationship workspace. Create your professional identity, share instantly, capture connections, remember context, follow up, and grow your network."
+    />
+    <!-- Set to the production origin at deploy time. A canonical pointing at the
+         preview host tells search engines the real site is a duplicate of it. -->
+    <link rel="canonical" href="https://digicon.app/" />
+
+    <!-- Official DigiCon icon set -->
+    <link rel="icon" type="image/webp" href="/favicon.webp" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- PWA -->
+    <meta name="theme-color" content="#050b1c" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DigiCon" />
+    <meta name="application-name" content="DigiCon" />
+
+    <!-- Open Graph / social -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="DigiCon" />
+    <meta property="og:title" content="DigiCon — More than a digital business card. It's your relationship workspace." />
+    <meta
+      property="og:description"
+      content="Create your professional identity, share it instantly by QR, link or NFC, capture the people you meet, remember what you discussed, follow up on time, and grow your network."
+    />
+    <meta property="og:image" content="https://digicon.app/brand/connect.webp" />
+    <meta
+      property="og:image:alt"
+      content="DigiCon digital business card and relationship workspace helping professionals connect, manage contacts and follow up"
+    />
+    <meta property="og:url" content="https://digicon.app/" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="DigiCon — Your professional identity. Your connections. Your network." />
+    <meta
+      name="twitter:description"
+      content="DigiCon turns an introduction into a relationship you can manage: capture, remember, follow up and grow."
+    />
+    <meta name="twitter:image" content="https://digicon.app/brand/connect.webp" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js").catch(() => {});
+        });
+      }
+    </script>
+  </body>
+</html>
